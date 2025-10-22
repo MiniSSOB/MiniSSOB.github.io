@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gravity Glitch</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px;
+            box-sizing: border-box;
+            min-height: 100%;
+            background: #222;
+            color: #00ff00;
+            font-family: Verdana, sans-serif;
+        }
+        canvas {
+            border: 3px solid #00ff00;
+            background: #111;
+            display: block;
+        }
+        #controls {
+            margin: 10px 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        input[type="text"] {
+            padding: 6px;
+            font-size: 14px;
+            border: 1px solid #00aa00;
+            background: #111;
+            color: #00ff00;
+        }
+        button {
+            background: #00aa00;
+            color: #002200;
+            border: none;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        a.back {
+            color: #00ff00;
+            margin-left: 6px;
+            text-decoration: none;
+        }
+        #score, #status, #lives {
+            font-size: 18px;
+            margin: 3px;
+            text-shadow: 0 0 5px #00ff00;
+        }
+
+        /* Game overlay */
+        #overlay {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+        #overlay .panel {
+            pointer-events: auto;
+            background: rgba(0,0,0,0.88);
+            border: 2px solid #00ff00;
+            padding: 20px;
+            text-align: center;
+            color: #00ff00;
+        }
+
+        /* Leaderboard area */
+        #leaderboardWrap {
+            margin-top: 12px;
+            width: 90%;
+            max-width: 760px;
+            text-align: left;
+            color: #00ff00;
+            border-top: 1px solid #004400;
+            padding-top: 8px;
+            font-size: 14px;
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+        }
+        #leaderboardControls {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        #leaderboardCanvas {
+            flex: 1;
+            background: #000;
+            border: 1px solid #003300;
+        }
+        .lbBtn {
+            padding: 6px 8px;
+            background: #004400;
+            color: #00ff00;
+            border: 1px solid #007700;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>Gravity Glitch</h1>
+
+        <div id="controls">
+            <label for="playerNameInput">Name:</label>
+            <input id="playerNameInput" type="text" placeholder="Enter name (max 16 chars)" maxlength="16" />
+            <button id="saveNameBtn">Save Name</button>
+
+            <button id="startBtn">Start Game</button>
+
+            <div style="margin-left: 8px;">Score: <span id="score">0</span></div>
+            <div>Lives: <span id="lives">3</span></div>
+            <div>Status: <span id="status">Enter name and press Start or Space</span></div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <p style="margin:8px 0;">Use A/D to move, Space to flip gravity, collect green orbs, avoid red spikes!</p>
+        <p><a class="back" href="index.html">← Back to Home</a></p>
+
+        <div id="leaderboardWrap">
+            <canvas id="leaderboardCanvas" width="760" height="330"></canvas>
+            <div id="leaderboardControls">
+                <button id="lbUp" class="lbBtn">▲</button>
+                <button id="lbDown" class="lbBtn">▼</button>
+                <div style="font-size:12px; margin-top:8px;">Top 50 — shows 10 at a time</div>
+            </div>
+        </div>
+
+        <footer style="margin-top: 12px; color: #008800; font-size: 12px;">
+            © 2024 MiniBOSS GAMES (MBG)
+        </footer>
+    </div>
+
+    <div id="overlay">
+        <div class="panel">
+            <div id="gameOverText" style="font-size:20px; margin-bottom:8px;"></div>
+            <button id="restartBtn">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const statusDisplay = document.getElementById('status');
+        const overlay = document.getElementById('overlay');
+        const gameOverText = document.getElementById('gameOverText');
+        const restartBtn = document.getElementById('restartBtn');
+
+        const nameInput = document.getElementById('playerNameInput');
+        const saveNameBtn = document.getElementById('saveNameBtn');
+        const startBtn = document.getElementById('startBtn');
+        const livesDisplay = document.getElementById('lives');
+
+        // Leaderboard canvas elements
+        const lbCanvas = document.getElementById('leaderboardCanvas');
+        const lbCtx = lbCanvas.getContext('2d');
+        const lbUp = document.getElementById('lbUp');
+        const lbDown = document.getElementById('lbDown');
+
+        // responsive canvas (80% of viewport)
+        function resizeCanvas() {
+            const w = Math.max(300, Math.floor(window.innerWidth * 0.8));
+            const h = Math.max(200, Math.floor(window.innerHeight * 0.8));
+            const prevW = canvas.width || w;
+            const prevH = canvas.height || h;
+            const ratioX = (player.x + player.width/2) / prevW;
+            const ratioY = (player.y + player.height/2) / prevH;
+
+            canvas.width = w;
+            canvas.height = h;
+
+            player.x = Math.max(0, Math.min(canvas.width - player.width, ratioX * canvas.width - player.width/2));
+            player.y = Math.max(0, Math.min(canvas.height - player.height, ratioY * canvas.height - player.height/2));
+
+            // leaderboard canvas width adapt
+            const maxW = Math.min(760, Math.floor(window.innerWidth * 0.9));
+            lbCanvas.width = maxW;
+            lbCanvas.height = 330; // fixed to show ~10 rows
+            renderLeaderboardCanvas();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // Player
+        const player = {
+            x: 50,
+            y: 50,
+            width: 30,
+            height: 30,
+            speedX: 0,
+            speedY: 0,
+            gravity: 0.5,
+            onGround: false
+        };
+
+        let currentPlayerName = '';
+        let score = 0;
+        let gravityDirection = 1;
+        let gravityScale = 1;
+        let orbs = [];
+        let spikes = [];
+        let powerups = [];
+        let gameOver = false;
+        let gameStarted = false;
+        let lives = 3;
+        const MAX_LIVES = 5;
+
+        // leaderboard persistence
+        const STORAGE_KEY = 'gravityGlitchLeaderboard';
+        function loadLeaderboard() {
+            try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch (e) { return []; }
+        }
+        function saveLeaderboard(list) {
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch (e) {}
+        }
+
+        // Leaderboard canvas renderer + scrolling
+        let lbScrollIndex = 0;
+        const LB_VISIBLE = 10;
+        const LB_MAX = 50;
+        function getLeaderboardList() {
+            const list = loadLeaderboard().slice(0); // clone
+            list.sort((a,b) => b.score - a.score);
+            return list.slice(0, LB_MAX);
+        }
+        function renderLeaderboardCanvas() {
+            const list = getLeaderboardList();
+            const w = lbCanvas.width;
+            const h = lbCanvas.height;
+            lbCtx.clearRect(0,0,w,h);
+
+            // background/title
+            lbCtx.fillStyle = '#001100';
+            lbCtx.fillRect(0,0,w,h);
+            lbCtx.fillStyle = '#00ff00';
+            lbCtx.font = '18px Verdana';
+            lbCtx.textBaseline = 'top';
+            lbCtx.fillText('Leaderboard — Top ' + LB_MAX, 10, 8);
+
+            // rows
+            const startY = 36;
+            const rowH = Math.floor((h - startY - 10) / LB_VISIBLE);
+            for (let i = 0; i < LB_VISIBLE; i++) {
+                const idx = lbScrollIndex + i;
+                const y = startY + i * rowH;
+                // background stripe
+                lbCtx.fillStyle = (i % 2 === 0) ? 'rgba(0,255,0,0.04)' : 'rgba(0,255,0,0.02)';
+                lbCtx.fillRect(6, y, w - 12, rowH - 2);
+
+                if (idx < list.length) {
+                    const entry = list[idx];
+                    lbCtx.fillStyle = '#00ff00';
+                    lbCtx.font = '14px Verdana';
+                    const rankText = (idx + 1) + '.';
+                    lbCtx.fillText(rankText, 12, y + 6);
+                    // name (clamped)
+                    const name = (entry.name || 'Anon').slice(0,20);
+                    lbCtx.fillText(name, 56, y + 6);
+                    // score right aligned
+                    const scoreText = entry.score.toString();
+                    lbCtx.textAlign = 'right';
+                    lbCtx.fillText(scoreText, w - 12, y + 6);
+                    lbCtx.textAlign = 'left';
+                } else {
+                    // empty row
+                    lbCtx.fillStyle = 'rgba(0,255,0,0.06)';
+                    lbCtx.font = '13px Verdana';
+                    lbCtx.fillText('-', 12, y + 6);
+                }
+            }
+
+            // scrollbar indicator on right
+            const total = Math.max(1, getLeaderboardList().length);
+            const scrollbarH = Math.max(24, Math.floor((LB_VISIBLE / Math.min(LB_VISIBLE, total)) * (h - startY - 20)));
+            const maxScroll = Math.max(0, total - LB_VISIBLE);
+            const scrollRatio = maxScroll ? lbScrollIndex / maxScroll : 0;
+            const trackY = startY + 2;
+            const trackH = h - startY - 12;
+            const thumbY = trackY + Math.floor(scrollRatio * (trackH - scrollbarH));
+            lbCtx.fillStyle = 'rgba(0,255,0,0.12)';
+            lbCtx.fillRect(w - 18, trackY, 12, trackH);
+            lbCtx.fillStyle = '#00ff00';
+            lbCtx.fillRect(w - 16, thumbY, 8, scrollbarH);
+        }
+
+        // Orb / Spike / PowerUp classes (unchanged behavior)
+        class Orb {
+            constructor() {
+                this.radius = 10;
+                this.x = Math.random() * (canvas.width - 20) + 10;
+                this.y = Math.random() * (canvas.height - 20) + 10;
+            }
+            draw() {
+                ctx.fillStyle = '#00ff00';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        class Spike {
+            constructor() {
+                this.width = 20;
+                this.height = 20;
+                this.y = Math.random() < 0.5 ? 0 : canvas.height;
+                this.x = this.randomSafeX();
+            }
+            randomSafeX() {
+                const safeDistance = 80;
+                let x, attempts = 0;
+                do {
+                    x = Math.random() * (canvas.width - this.width);
+                    attempts++;
+                    if (attempts > 50) break;
+                } while (Math.abs(x + this.width/2 - (player.x + player.width/2)) < safeDistance);
+                return x;
+            }
+            draw() {
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                if (this.y === 0) {
+                    ctx.moveTo(this.x, this.y);
+                    ctx.lineTo(this.x + this.width/2, this.y + this.height);
+                    ctx.lineTo(this.x + this.width, this.y);
+                } else {
+                    ctx.moveTo(this.x, this.y);
+                    ctx.lineTo(this.x + this.width/2, this.y - this.height);
+                    ctx.lineTo(this.x + this.width, this.y);
+                }
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+        class PowerUp {
+            constructor(type) {
+                this.type = type;
+                this.radius = 12;
+                const safe = 100;
+                let attempts = 0;
+                do {
+                    this.x = Math.random() * (canvas.width - 40) + 20;
+                    this.y = Math.random() * (canvas.height - 40) + 20;
+                    attempts++;
+                    if (attempts > 80) break;
+                } while (Math.hypot((this.x) - (player.x + player.width/2), (this.y) - (player.y + player.height/2)) < safe);
+            }
+            draw() {
+                if (this.type === 'clearSpikes') lbColor = '#ff8800';
+                else if (this.type === 'magnetOrbs') lbColor = '#00ffff';
+                else lbColor = '#ff00ff';
+                ctx.fillStyle = lbColor;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#002200';
+                ctx.font = '12px Verdana';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const label = this.type === 'clearSpikes' ? 'C' : this.type === 'magnetOrbs' ? 'M' : 'L';
+                ctx.fillText(label, this.x, this.y + 1);
+            }
+        }
+
+        // Controls using e.code (fixes sticky movement)
+        let keys = {};
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') e.preventDefault();
+            keys[e.code] = true;
+            if (e.code === 'Space') {
+                if (!gameStarted && !gameOver) {
+                    if (!currentPlayerName) { statusDisplay.textContent = 'Please enter a name before starting'; return; }
+                    startGame();
+                    return;
+                }
+                if (!gameOver && gameStarted) {
+                    gravityDirection *= -1;
+                    player.speedY = 0;
+                    gravityScale = 0.5;
+                    clearTimeout(window._restoreGravityTimer);
+                    window._restoreGravityTimer = setTimeout(() => gravityScale = 1, 700);
+                    statusDisplay.textContent = gravityDirection === 1 ? 'Normal Gravity' : 'Upside Down!';
+                }
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // Spawning helpers
+        function spawnOrb() { orbs.push(new Orb()); }
+        function spawnSpike() {
+            const spike = new Spike();
+            const safeDistance = 60;
+            if (Math.abs(spike.x + spike.width/2 - (player.x + player.width/2)) < safeDistance) {
+                if (spike.x < canvas.width/2) spike.x = Math.max(0, player.x + player.width/2 + safeDistance);
+                else spike.x = Math.min(canvas.width - spike.width, player.x + player.width/2 - safeDistance);
+            }
+            spikes.push(spike);
+        }
+        function spawnPowerUpRandom() {
+            const types = ['clearSpikes','magnetOrbs','extraLife'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            powerups.push(new PowerUp(type));
+        }
+
+        // Reset / Start / End
+        let loopRunning = false;
+        function resetGameState() {
+            score = 0;
+            gameOver = false;
+            gameStarted = false;
+            gravityDirection = 1;
+            gravityScale = 1;
+            orbs = [];
+            spikes = [];
+            powerups = [];
+            player.width = 30;
+            player.height = 30;
+            player.x = 50;
+            player.y = canvas.height - 50;
+            player.speedX = 0;
+            player.speedY = 0;
+            keys = {}; // clear keys so movement stops
+            lives = 3;
+            statusDisplay.textContent = 'Enter name and press Start or Space';
+            overlay.style.display = 'none';
+            livesDisplay.textContent = lives;
+            scoreDisplay.textContent = score;
+            // initial safe spawns
+            for (let i = 0; i < 4; i++) spawnOrb();
+            for (let i = 0; i < 3; i++) spawnSpike();
+            renderLeaderboardCanvas();
+        }
+
+        function startGame() {
+            if (!currentPlayerName) { statusDisplay.textContent = 'Please enter a name before starting'; return; }
+            if (!loopRunning) { loopRunning = true; requestAnimationFrame(gameLoop); }
+            gameStarted = true;
+            statusDisplay.textContent = gravityDirection === 1 ? 'Normal Gravity' : 'Upside Down!';
+        }
+
+        function endGame() {
+            gameOver = true;
+            overlay.style.display = 'flex';
+            gameOverText.textContent = 'Game Over! Score: ' + score;
+            statusDisplay.textContent = 'Game Over';
+            // save to leaderboard
+            const list = loadLeaderboard();
+            list.push({ name: currentPlayerName || 'Anon', score: score, date: new Date().toISOString() });
+            list.sort((a, b) => b.score - a.score);
+            saveLeaderboard(list.slice(0, 100));
+            // update leaderboard view and reset scroll to top
+            lbScrollIndex = 0;
+            renderLeaderboardCanvas();
+        }
+
+        // Power-up effects
+        function applyPowerUp(p) {
+            if (p.type === 'clearSpikes') {
+                spikes = [];
+            } else if (p.type === 'magnetOrbs') {
+                let gained = 0;
+                for (let i = orbs.length -1; i >= 0; i--) {
+                    gained += 5;
+                    orbs.splice(i,1);
+                }
+                score += gained;
+            } else if (p.type === 'extraLife') {
+                lives = Math.min(MAX_LIVES, lives + 1);
+                livesDisplay.textContent = lives;
+            }
+        }
+
+        // Game loop
+        function gameLoop() {
+            loopRunning = true;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (!gameStarted) {
+                // idle draw
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(player.x, player.y, player.width, player.height);
+                orbs.forEach(orb => orb.draw());
+                spikes.forEach(spike => spike.draw());
+                powerups.forEach(p => p.draw());
+                scoreDisplay.textContent = score;
+                if (!gameOver) requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            if (gameOver) {
+                loopRunning = false;
+                return;
+            }
+
+            // movement using e.code keys
+            if (keys['KeyA']) player.speedX = -5;
+            else if (keys['KeyD']) player.speedX = 5;
+            else player.speedX = 0;
+
+            player.speedY += player.gravity * gravityDirection * gravityScale;
+            player.x += player.speedX;
+            player.y += player.speedY;
+
+            // collisions with bounds
+            if (gravityDirection === 1) {
+                if (player.y > canvas.height - player.height) {
+                    player.y = canvas.height - player.height;
+                    player.speedY = 0;
+                    player.onGround = true;
+                } else player.onGround = false;
+            } else {
+                if (player.y < 0) {
+                    player.y = 0;
+                    player.speedY = 0;
+                    player.onGround = true;
+                } else player.onGround = false;
+            }
+
+            if (player.x < 0) player.x = 0;
+            if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
+
+            // draw player
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // orbs
+            for (let i = orbs.length - 1; i >= 0; i--) {
+                const orb = orbs[i];
+                orb.draw();
+                const dist = Math.hypot(player.x + player.width/2 - orb.x, player.y + player.height/2 - orb.y);
+                if (dist < player.width/2 + orb.radius) {
+                    score += 5;
+                    orbs.splice(i, 1);
+                }
+            }
+
+            // powerups draw & collide
+            for (let i = powerups.length -1; i >= 0; i--) {
+                const p = powerups[i];
+                p.draw();
+                const dist = Math.hypot(player.x + player.width/2 - p.x, player.y + player.height/2 - p.y);
+                if (dist < player.width/2 + p.radius) {
+                    applyPowerUp(p);
+                    powerups.splice(i,1);
+                }
+            }
+
+            // spikes
+            for (let i = spikes.length - 1; i >= 0; i--) {
+                const spike = spikes[i];
+                spike.draw();
+                const spikeCenterX = spike.x + spike.width/2;
+                const spikeCenterY = spike.y === 0 ? spike.height/2 : spike.y - spike.height/2;
+                const distX = Math.abs(player.x + player.width/2 - spikeCenterX);
+                const distY = Math.abs(player.y + player.height/2 - spikeCenterY);
+                if (distX < player.width/2 + spike.width/2 && distY < player.height/2 + spike.height/2) {
+                    if (lives > 0) {
+                        lives--;
+                        livesDisplay.textContent = lives;
+                        spikes.splice(i,1);
+                        player.speedY = -6 * gravityDirection;
+                    } else {
+                        endGame();
+                        break;
+                    }
+                }
+            }
+
+            // spawn new items
+            if (Math.random() < 0.02) spawnOrb();
+            if (Math.random() < 0.01) spawnSpike();
+
+            scoreDisplay.textContent = score;
+            requestAnimationFrame(gameLoop);
+        }
+
+        // powerups spawn about once a minute
+        let powerupInterval = setInterval(() => {
+            if (gameStarted && !gameOver) {
+                if (Math.random() < 0.65) spawnPowerUpRandom();
+            } else {
+                if (Math.random() < 0.08) spawnPowerUpRandom();
+            }
+        }, 60000);
+
+        // UI bindings
+        saveNameBtn.addEventListener('click', () => {
+            const v = nameInput.value.trim();
+            if (!v) { statusDisplay.textContent = 'Name cannot be empty'; return; }
+            currentPlayerName = v.slice(0,16);
+            statusDisplay.textContent = `Name saved: ${currentPlayerName}`;
+        });
+
+        startBtn.addEventListener('click', () => {
+            if (!currentPlayerName) { statusDisplay.textContent = 'Please enter a name before starting'; return; }
+            resetGameState();
+            startGame();
+        });
+
+        restartBtn.addEventListener('click', () => {
+            resetGameState();
+            // keep the saved name
+            if (!loopRunning) requestAnimationFrame(gameLoop);
+        });
+
+        // leaderboard canvas interactions
+        lbUp.addEventListener('click', () => {
+            lbScrollIndex = Math.max(0, lbScrollIndex - 1);
+            renderLeaderboardCanvas();
+        });
+        lbDown.addEventListener('click', () => {
+            const total = Math.max(0, getLeaderboardList().length);
+            lbScrollIndex = Math.min(Math.max(0, total - LB_VISIBLE), lbScrollIndex + 1);
+            renderLeaderboardCanvas();
+        });
+        lbCanvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = Math.sign(e.deltaY);
+            const total = Math.max(0, getLeaderboardList().length);
+            lbScrollIndex = Math.min(Math.max(0, total - LB_VISIBLE), lbScrollIndex + delta);
+            renderLeaderboardCanvas();
+        }, { passive: false });
+
+        // initial setup
+        resizeCanvas();
+        resetGameState();
+        renderLeaderboardCanvas();
+        // make canvas focusable so keyboard works reliably
+        canvas.tabIndex = 1000;
+        canvas.style.outline = 'none';
+        canvas.focus();
+    </script>
+</body>
+</html>
