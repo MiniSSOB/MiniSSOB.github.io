@@ -2,6 +2,9 @@
 <html>
 <head>
     <title>MiniBOSS GAMES</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
     <style>
         body {
             background: #111;
@@ -148,6 +151,20 @@
             margin-right: 10px;
             vertical-align: middle;
         }
+
+        /* Global Stats */
+        .global-stats {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(0, 51, 0, 0.3);
+            border: 1px solid var(--main-color, #00ff00);
+            border-radius: 8px;
+            display: inline-block;
+        }
+        .stat-item {
+            margin: 5px 15px;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -180,6 +197,15 @@
             <strong>Current Player:</strong> <span id="currentPlayerName"></span>
         </div>
 
+        <div class="global-stats">
+            <div class="stat-item">
+                <strong>🌐 Global Players:</strong> <span id="globalPlayers">0</span>
+            </div>
+            <div class="stat-item">
+                <strong>🏆 Total Games Played:</strong> <span id="totalGames">0</span>
+            </div>
+        </div>
+
         <div class="game-list">
             <a id="gravityGlitchLink" href="gravity-glitch.html" class="game-link">🎮 Gravity Glitch</a>
         </div>
@@ -191,6 +217,27 @@
     </div>
 
     <script>
+        // === FIREBASE CONFIGURATION ===
+        // REPLACE THESE VALUES WITH YOUR ACTUAL FIREBASE CONFIG
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY_HERE",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        let db;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            console.log("Firebase initialized successfully");
+        } catch (error) {
+            console.log("Firebase initialization failed:", error);
+        }
+
         // Color customization system
         const COLOR_STORAGE_KEY = 'minibossThemeColor';
         
@@ -234,6 +281,63 @@
         const savedColor = loadColor();
         document.documentElement.style.setProperty('--main-color', savedColor);
 
+        // === FIREBASE FUNCTIONS ===
+        async function trackPortalVisit() {
+            if (!db) return;
+            
+            try {
+                const playerName = localStorage.getItem('portalPlayerName');
+                const visitData = {
+                    playerName: playerName,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    userAgent: navigator.userAgent.substring(0, 100),
+                    screenResolution: `${screen.width}x${screen.height}`
+                };
+                
+                await db.collection('portalVisits').add(visitData);
+                console.log("Portal visit tracked");
+            } catch (error) {
+                console.log("Error tracking portal visit:", error);
+            }
+        }
+
+        async function updateGlobalStats() {
+            if (!db) {
+                document.getElementById('globalPlayers').textContent = 'Offline';
+                document.getElementById('totalGames').textContent = 'Offline';
+                return;
+            }
+
+            try {
+                // Get unique players (last 30 days)
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                
+                const playersSnapshot = await db.collection('portalVisits')
+                    .where('timestamp', '>=', thirtyDaysAgo)
+                    .get();
+                
+                const uniquePlayers = new Set();
+                playersSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.playerName) {
+                        uniquePlayers.add(data.playerName);
+                    }
+                });
+
+                // Get total games played
+                const gamesSnapshot = await db.collection('gameScores').count().get();
+                const totalGames = gamesSnapshot.data().count;
+
+                document.getElementById('globalPlayers').textContent = uniquePlayers.size;
+                document.getElementById('totalGames').textContent = totalGames;
+            } catch (error) {
+                console.log("Error updating global stats:", error);
+                document.getElementById('globalPlayers').textContent = 'Error';
+                document.getElementById('totalGames').textContent = 'Error';
+            }
+        }
+
         // Visitor counter system for main page
         const MAIN_VISITOR_STORAGE_KEY = 'mainPageVisitors';
         const MAIN_VISITOR_SESSION_KEY = 'mainPageSession';
@@ -253,6 +357,9 @@
                 }
                 
                 saveVisitorData(visitorData);
+
+                // Track portal visit in Firebase
+                trackPortalVisit();
             }
             
             document.getElementById('totalVisits').textContent = visitorData.totalVisits;
@@ -316,6 +423,11 @@
                 nameSetup.style.display = 'none';
                 mainContent.style.display = 'block';
                 document.getElementById('currentPlayerName').textContent = savedName;
+                
+                // Initialize Firebase systems
+                updateGlobalStats();
+                // Update stats every 30 seconds
+                setInterval(updateGlobalStats, 30000);
             } else {
                 nameSetup.style.display = 'block';
                 mainContent.style.display = 'none';
