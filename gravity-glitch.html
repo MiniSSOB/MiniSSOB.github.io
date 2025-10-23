@@ -1,648 +1,935 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8" />
     <title>Gravity Glitch</title>
     <style>
-        html, body {
-            height: 100%;
-            margin: 0;
+        :root {
+            --main-color: #00ff00;
+            --secondary-color: #00aa00;
         }
-        #container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 12px;
-            box-sizing: border-box;
-            min-height: 100%;
+        html,body{height:100%;margin:0;background:#222;color:var(--main-color);font-family:Verdana, sans-serif;}
+        #container{width:100%;max-width:980px;padding:12px;box-sizing:border-box;margin:0 auto;display:flex;flex-direction:column;align-items:center;}
+        canvas#gameCanvas{border:3px solid var(--main-color);background:#111;display:block;max-width:100%;cursor: pointer;}
+        #controls{margin:10px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+        button{background:var(--secondary-color);color:#002200;border:none;padding:8px 12px;cursor:pointer;font-weight:bold;}
+        a.back{color:var(--main-color);text-decoration:none;}
+        #score,#status,#lives,#timer,#inactivityTimer{font-size:16px;text-shadow:0 0 5px var(--main-color);}
+        #overlay{position:fixed;left:0;right:0;top:0;bottom:0;display:none;align-items:center;justify-content:center;}
+        #overlay .panel{pointer-events:auto;background:rgba(0,0,0,0.92);border:2px solid var(--main-color);padding:20px;color:var(--main-color);text-align:center;}
+        #leaderboardWrap{margin-top:12px;width:100%;display:flex;justify-content:center;overflow:hidden;}
+        #leaderboardCanvas{background:#000;border:1px solid #003300;width:660px;height:330px;display:block;}
+        footer{margin-top:12px;color:var(--main-color);font-size:12px;}
+        .player-info{font-size:16px;margin-bottom:10px;padding:5px 10px;background:#003300;border:1px solid var(--main-color);border-radius:5px;}
+        .visitor-counter{font-size:12px;color:var(--main-color);margin-top:5px;}
+        
+        /* Color Picker Styles */
+        .color-picker {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .color-toggle {
             background: #222;
-            color: #00ff00;
-            font-family: Verdana, sans-serif;
-        }
-        canvas {
-            border: 3px solid #00ff00;
-            background: #111;
-            display: block;
-        }
-        #controls {
-            margin: 10px 0;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        input[type="text"] {
-            padding: 6px;
-            font-size: 14px;
-            border: 1px solid #00aa00;
-            background: #111;
-            color: #00ff00;
-        }
-        button {
-            background: #00aa00;
-            color: #002200;
-            border: none;
-            padding: 8px 12px;
+            color: var(--main-color);
+            border: 2px solid var(--main-color);
+            padding: 10px;
+            border-radius: 5px;
             cursor: pointer;
-            font-weight: bold;
+            font-size: 14px;
         }
-        a.back {
-            color: #00ff00;
-            margin-left: 6px;
-            text-decoration: none;
-        }
-        #score, #status, #lives {
-            font-size: 18px;
-            margin: 3px;
-            text-shadow: 0 0 5px #00ff00;
-        }
-
-        /* Game overlay */
-        #overlay {
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 0;
-            bottom: 0;
+        .color-options {
             display: none;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: #222;
+            border: 2px solid var(--main-color);
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 5px;
+            min-width: 150px;
         }
-        #overlay .panel {
-            pointer-events: auto;
-            background: rgba(0,0,0,0.88);
-            border: 2px solid #00ff00;
-            padding: 20px;
-            text-align: center;
-            color: #00ff00;
-        }
-
-        /* Leaderboard area */
-        #leaderboardWrap {
-            margin-top: 12px;
-            width: 90%;
-            max-width: 760px;
-            text-align: left;
-            color: #00ff00;
-            border-top: 1px solid #004400;
-            padding-top: 8px;
-            font-size: 14px;
-            display: flex;
-            gap: 8px;
-            align-items: flex-start;
-        }
-        #leaderboardControls {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        #leaderboardCanvas {
-            flex: 1;
-            background: #000;
-            border: 1px solid #003300;
-        }
-        .lbBtn {
-            padding: 6px 8px;
-            background: #004400;
-            color: #00ff00;
-            border: 1px solid #007700;
+        .color-option {
+            display: block;
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 3px;
             cursor: pointer;
+            text-align: left;
         }
+        .color-option:hover {
+            background: #444;
+        }
+        .color-preview {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        
+        .no-ui{outline:none}
     </style>
 </head>
 <body>
+    <div class="color-picker">
+        <div class="color-toggle" onclick="toggleColorOptions()">🎨 Theme</div>
+        <div class="color-options" id="colorOptions">
+            <button class="color-option" onclick="setColor('#00ff00')"><span class="color-preview" style="background:#00ff00"></span>Green</button>
+            <button class="color-option" onclick="setColor('#ff0000')"><span class="color-preview" style="background:#ff0000"></span>Red</button>
+            <button class="color-option" onclick="setColor('#0000ff')"><span class="color-preview" style="background:#0000ff"></span>Blue</button>
+            <button class="color-option" onclick="setColor('#ffff00')"><span class="color-preview" style="background:#ffff00"></span>Yellow</button>
+            <button class="color-option" onclick="setColor('#ff00ff')"><span class="color-preview" style="background:#ff00ff"></span>Magenta</button>
+            <button class="color-option" onclick="setColor('#00ffff')"><span class="color-preview" style="background:#00ffff"></span>Cyan</button>
+            <button class="color-option" onclick="setColor('#ff8800')"><span class="color-preview" style="background:#ff8800"></span>Orange</button>
+            <button class="color-option" onclick="setColor('#ffffff')"><span class="color-preview" style="background:#ffffff"></span>White</button>
+        </div>
+    </div>
+
     <div id="container">
         <h1>Gravity Glitch</h1>
 
-        <div id="controls">
-            <label for="playerNameInput">Name:</label>
-            <input id="playerNameInput" type="text" placeholder="Enter name (max 16 chars)" maxlength="16" />
-            <button id="saveNameBtn">Save Name</button>
-
-            <button id="startBtn">Start Game</button>
-
-            <div style="margin-left: 8px;">Score: <span id="score">0</span></div>
-            <div>Lives: <span id="lives">3</span></div>
-            <div>Status: <span id="status">Enter name and press Start or Space</span></div>
+        <div class="player-info">
+            Player: <span id="currentPlayerName">Loading...</span>
         </div>
 
-        <canvas id="gameCanvas"></canvas>
+        <div id="controls">
+            <button id="startBtn">Start Game</button>
+            <div>Score: <span id="score">0</span></div>
+            <div>Time: <span id="timer">0:00.00</span></div>
+            <div>Lives: <span id="lives">3</span></div>
+            <div>Inactivity: <span id="inactivityTimer">6.0s</span></div>
+            <div>Status: <span id="status">Press Start or Space to begin</span></div>
+        </div>
+
+        <canvas id="gameCanvas" class="no-ui" width="800" height="600"></canvas>
 
         <p style="margin:8px 0;">Use A/D to move, Space to flip gravity, collect green orbs, avoid red spikes!</p>
         <p><a class="back" href="index.html">← Back to Home</a></p>
 
         <div id="leaderboardWrap">
-            <canvas id="leaderboardCanvas" width="760" height="330"></canvas>
-            <div id="leaderboardControls">
-                <button id="lbUp" class="lbBtn">▲</button>
-                <button id="lbDown" class="lbBtn">▼</button>
-                <div style="font-size:12px; margin-top:8px;">Top 50 — shows 10 at a time</div>
-            </div>
+            <canvas id="leaderboardCanvas" width="660" height="330" class="no-ui"></canvas>
         </div>
 
-        <footer style="margin-top: 12px; color: #008800; font-size: 12px;">
-            © 2024 MiniBOSS GAMES (MBG)
-        </footer>
+        <footer>© 2024 MiniBOSS GAMES (MBG)</footer>
+        <div class="visitor-counter">Game Visits: <span id="gameVisits">0</span> | Unique Visitors: <span id="uniqueVisitors">0</span></div>
     </div>
 
     <div id="overlay">
         <div class="panel">
-            <div id="gameOverText" style="font-size:20px; margin-bottom:8px;"></div>
+            <div id="gameOverText" style="font-size:20px;margin-bottom:8px;"></div>
             <button id="restartBtn">Play Again</button>
+            <div style="margin-top:8px;font-size:12px;">Press Space or click Play Again to restart</div>
         </div>
     </div>
 
     <script>
+        // Color customization system
+        const COLOR_STORAGE_KEY = 'minibossThemeColor';
+        
+        function loadColor() {
+            try {
+                return localStorage.getItem(COLOR_STORAGE_KEY) || '#00ff00';
+            } catch (e) {
+                return '#00ff00';
+            }
+        }
+        
+        function saveColor(color) {
+            try {
+                localStorage.setItem(COLOR_STORAGE_KEY, color);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        function setColor(color) {
+            document.documentElement.style.setProperty('--main-color', color);
+            // Calculate a slightly darker version for secondary elements
+            const secondaryColor = adjustColorBrightness(color, -30);
+            document.documentElement.style.setProperty('--secondary-color', secondaryColor);
+            saveColor(color);
+            toggleColorOptions();
+        }
+        
+        function adjustColorBrightness(color, percent) {
+            const num = parseInt(color.slice(1), 16);
+            const amt = Math.round(2.55 * percent);
+            const R = (num >> 16) + amt;
+            const G = (num >> 8 & 0x00FF) + amt;
+            const B = (num & 0x0000FF) + amt;
+            return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+                (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+                (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+        }
+        
+        function toggleColorOptions() {
+            const options = document.getElementById('colorOptions');
+            options.style.display = options.style.display === 'block' ? 'none' : 'block';
+        }
+        
+        // Apply saved color on load
+        const savedColor = loadColor();
+        setColor(savedColor);
+
+        // Close color picker when clicking outside
+        document.addEventListener('click', function(event) {
+            const colorPicker = document.querySelector('.color-picker');
+            if (!colorPicker.contains(event.target)) {
+                document.getElementById('colorOptions').style.display = 'none';
+            }
+        });
+
+        // Elements
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreDisplay = document.getElementById('score');
+        const timerDisplay = document.getElementById('timer');
         const statusDisplay = document.getElementById('status');
         const overlay = document.getElementById('overlay');
         const gameOverText = document.getElementById('gameOverText');
         const restartBtn = document.getElementById('restartBtn');
+        const currentPlayerNameDisplay = document.getElementById('currentPlayerName');
 
-        const nameInput = document.getElementById('playerNameInput');
-        const saveNameBtn = document.getElementById('saveNameBtn');
         const startBtn = document.getElementById('startBtn');
         const livesDisplay = document.getElementById('lives');
+        const inactivityTimerDisplay = document.getElementById('inactivityTimer');
+        const gameVisitsDisplay = document.getElementById('gameVisits');
+        const uniqueVisitorsDisplay = document.getElementById('uniqueVisitors');
 
-        // Leaderboard canvas elements
         const lbCanvas = document.getElementById('leaderboardCanvas');
         const lbCtx = lbCanvas.getContext('2d');
-        const lbUp = document.getElementById('lbUp');
-        const lbDown = document.getElementById('lbDown');
 
-        // responsive canvas (80% of viewport)
+        // Player name system
+        const PLAYER_NAME_KEY = 'minibossPlayerName';
+        let currentPlayerName = '';
+
+        function loadPlayerName() {
+            try {
+                return localStorage.getItem(PLAYER_NAME_KEY);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function checkPlayerName() {
+            const name = loadPlayerName();
+            if (!name) {
+                alert('Please set your player name on the main page first!');
+                window.location.href = 'index.html';
+                return false;
+            }
+            currentPlayerName = name;
+            currentPlayerNameDisplay.textContent = name;
+            return true;
+        }
+
+        // Visitor counter system
+        const GAME_VISITOR_STORAGE_KEY = 'gravityGlitchVisitors_v2';
+        const GAME_VISITOR_SESSION_KEY = 'gravityGlitchSession_v2';
+        
+        function initVisitorCounter() {
+            let visitorData = loadVisitorData();
+            const currentSessionId = generateSessionId();
+            
+            const lastSessionId = sessionStorage.getItem(GAME_VISITOR_SESSION_KEY);
+            if (!lastSessionId) {
+                visitorData.totalVisits++;
+                sessionStorage.setItem(GAME_VISITOR_SESSION_KEY, currentSessionId);
+                
+                const visitorFingerprint = getVisitorFingerprint();
+                if (!visitorData.uniqueVisitors.includes(visitorFingerprint)) {
+                    visitorData.uniqueVisitors.push(visitorFingerprint);
+                }
+                
+                saveVisitorData(visitorData);
+            }
+            
+            gameVisitsDisplay.textContent = visitorData.totalVisits;
+            uniqueVisitorsDisplay.textContent = visitorData.uniqueVisitors.length;
+        }
+        
+        function loadVisitorData() {
+            try {
+                const data = localStorage.getItem(GAME_VISITOR_STORAGE_KEY);
+                if (data) {
+                    return JSON.parse(data);
+                }
+            } catch (e) {}
+            
+            return {
+                totalVisits: 0,
+                uniqueVisitors: []
+            };
+        }
+        
+        function saveVisitorData(data) {
+            try {
+                localStorage.setItem(GAME_VISITOR_STORAGE_KEY, JSON.stringify(data));
+            } catch (e) {}
+        }
+        
+        function generateSessionId() {
+            return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        function getVisitorFingerprint() {
+            return btoa(navigator.userAgent + screen.width + screen.height + screen.colorDepth);
+        }
+
+        // Responsive canvas sizing - FIXED: Player starts on floor
         function resizeCanvas() {
-            const w = Math.max(300, Math.floor(window.innerWidth * 0.8));
-            const h = Math.max(200, Math.floor(window.innerHeight * 0.8));
-            const prevW = canvas.width || w;
-            const prevH = canvas.height || h;
-            const ratioX = (player.x + player.width/2) / prevW;
-            const ratioY = (player.y + player.height/2) / prevH;
-
-            canvas.width = w;
-            canvas.height = h;
-
-            player.x = Math.max(0, Math.min(canvas.width - player.width, ratioX * canvas.width - player.width/2));
-            player.y = Math.max(0, Math.min(canvas.height - player.height, ratioY * canvas.height - player.height/2));
-
-            // leaderboard canvas width adapt
-            const maxW = Math.min(760, Math.floor(window.innerWidth * 0.9));
-            lbCanvas.width = maxW;
-            lbCanvas.height = 330; // fixed to show ~10 rows
+            const maxWidth = Math.max(400, Math.floor(window.innerWidth * 0.8));
+            const maxHeight = Math.max(240, Math.floor(window.innerHeight * 0.6));
+            
+            const targetWidth = Math.min(maxWidth, maxHeight * 1.33);
+            const targetHeight = Math.min(maxHeight, maxWidth * 0.75);
+            
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+            
+            // FIX: Position player on the floor
+            player.x = 50;
+            player.y = canvas.height - player.height - 10; // 10px from bottom
+            
             renderLeaderboardCanvas();
+            clampPlayerInside();
         }
         window.addEventListener('resize', resizeCanvas);
 
-        // Player
-        const player = {
-            x: 50,
-            y: 50,
-            width: 30,
-            height: 30,
-            speedX: 0,
-            speedY: 0,
-            gravity: 0.5,
-            onGround: false
+        // Player - FIXED: Start on floor
+        const player = { 
+            x: 50, 
+            y: 0, // Will be set properly in resizeCanvas
+            width: 30, 
+            height: 30, 
+            speedX: 0, 
+            speedY: 0, 
+            gravity: 0.5, 
+            onGround: false 
         };
 
-        let currentPlayerName = '';
+        // State
         let score = 0;
         let gravityDirection = 1;
         let gravityScale = 1;
-        let orbs = [];
-        let spikes = [];
-        let powerups = [];
-        let gameOver = false;
-        let gameStarted = false;
-        let lives = 3;
-        const MAX_LIVES = 5;
+        let orbs = [], spikes = [], powerups = [];
+        let gameOver = false, gameStarted = false;
+        let lives = 3; const MAX_LIVES = 10;
+        let loopRunning = false;
+        let gameStartTime = 0;
+        let powerupTimerId = null;
 
-        // leaderboard persistence
-        const STORAGE_KEY = 'gravityGlitchLeaderboard';
-        function loadLeaderboard() {
-            try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch (e) { return []; }
-        }
-        function saveLeaderboard(list) {
-            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch (e) {}
+        // FIXED: Spike spawn tracking to prevent speed increase
+        let lastSpikeSpawnScore = 0;
+        let spikeSpawnInterval = 23; // Spawn spikes another 30% faster (from 33 to 23)
+
+        // Game over reason tracking
+        let gameOverReason = '';
+
+        // Inactivity timer
+        let inactivityTime = 6.0;
+        let lastMovementTime = 0;
+        let inactivityTimerId = null;
+
+        // Chain for airborne collections
+        let chain = 0;
+
+        // Timer
+        let startTime = 0, elapsedMs = 0;
+        function formatTime(ms){
+            const totalSec = Math.floor(ms/10)/100;
+            const minutes = Math.floor(totalSec/60);
+            const seconds = Math.floor(totalSec%60);
+            const hundredths = Math.floor((totalSec - Math.floor(totalSec))*100);
+            return `${minutes}:${String(seconds).padStart(2,'0')}.${String(hundredths).padStart(2,'0')}`;
         }
 
-        // Leaderboard canvas renderer + scrolling
-        let lbScrollIndex = 0;
-        const LB_VISIBLE = 10;
-        const LB_MAX = 50;
-        function getLeaderboardList() {
-            const list = loadLeaderboard().slice(0); // clone
-            list.sort((a,b) => b.score - a.score);
-            return list.slice(0, LB_MAX);
+        // Leaderboard
+        const STORAGE_KEY = 'gravityGlitchLeaderboard_final_v2';
+        const LB_VISIBLE = 10, LB_MAX = 50;
+        
+        function loadLeaderboard(){ 
+            try{ 
+                const r = localStorage.getItem(STORAGE_KEY); 
+                return r ? JSON.parse(r) : []; 
+            } catch(e) { return []; }
         }
-        function renderLeaderboardCanvas() {
+        
+        function saveLeaderboard(list){ 
+            try{ 
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); 
+            } catch(e){} 
+        }
+        
+        function getLeaderboardList(){ 
+            const list = loadLeaderboard().slice(0); 
+            list.sort((a,b)=> b.score - a.score || a.timeMs - b.timeMs); 
+            return list.slice(0, LB_MAX); 
+        }
+
+        function updateLeaderboard(newEntry) {
+            let list = loadLeaderboard();
+            
+            const existingIndex = list.findIndex(entry => 
+                entry.name.toLowerCase() === newEntry.name.toLowerCase()
+            );
+            
+            if (existingIndex !== -1) {
+                if (newEntry.score > list[existingIndex].score) {
+                    list[existingIndex] = newEntry;
+                }
+                else if (newEntry.score === list[existingIndex].score && 
+                         newEntry.timeMs < list[existingIndex].timeMs) {
+                    list[existingIndex] = newEntry;
+                }
+            } else {
+                list.push(newEntry);
+            }
+            
+            list.sort((a,b) => b.score - a.score || a.timeMs - b.timeMs);
+            saveLeaderboard(list.slice(0, LB_MAX));
+        }
+
+        function renderLeaderboardCanvas(){
             const list = getLeaderboardList();
-            const w = lbCanvas.width;
-            const h = lbCanvas.height;
+            const w = lbCanvas.width, h = lbCanvas.height;
             lbCtx.clearRect(0,0,w,h);
-
-            // background/title
-            lbCtx.fillStyle = '#001100';
+            lbCtx.fillStyle = '#001100'; 
             lbCtx.fillRect(0,0,w,h);
-            lbCtx.fillStyle = '#00ff00';
-            lbCtx.font = '18px Verdana';
-            lbCtx.textBaseline = 'top';
+            lbCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--main-color').trim() || '#00ff00';
+            lbCtx.font = '18px Verdana'; 
+            lbCtx.textBaseline='top';
             lbCtx.fillText('Leaderboard — Top ' + LB_MAX, 10, 8);
-
-            // rows
             const startY = 36;
             const rowH = Math.floor((h - startY - 10) / LB_VISIBLE);
-            for (let i = 0; i < LB_VISIBLE; i++) {
-                const idx = lbScrollIndex + i;
-                const y = startY + i * rowH;
-                // background stripe
-                lbCtx.fillStyle = (i % 2 === 0) ? 'rgba(0,255,0,0.04)' : 'rgba(0,255,0,0.02)';
-                lbCtx.fillRect(6, y, w - 12, rowH - 2);
-
-                if (idx < list.length) {
-                    const entry = list[idx];
-                    lbCtx.fillStyle = '#00ff00';
+            for(let i=0;i<LB_VISIBLE;i++){
+                const idx = i;
+                const y = startY + i*rowH;
+                lbCtx.fillStyle = (i%2===0)?'rgba(0,255,0,0.04)':'rgba(0,255,0,0.02)';
+                lbCtx.fillRect(6,y,w-12,rowH-2);
+                if(idx < list.length){
+                    const e = list[idx];
+                    lbCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--main-color').trim() || '#00ff00';
                     lbCtx.font = '14px Verdana';
-                    const rankText = (idx + 1) + '.';
-                    lbCtx.fillText(rankText, 12, y + 6);
-                    // name (clamped)
-                    const name = (entry.name || 'Anon').slice(0,20);
-                    lbCtx.fillText(name, 56, y + 6);
-                    // score right aligned
-                    const scoreText = entry.score.toString();
+                    lbCtx.fillText((idx+1)+'.', 12, y+6);
+                    lbCtx.fillText((e.name||'Anon').slice(0,18), 56, y+6);
+                    lbCtx.textAlign = 'center';
+                    lbCtx.fillText(formatTime(e.timeMs||0), Math.floor(w/2), y+6);
                     lbCtx.textAlign = 'right';
-                    lbCtx.fillText(scoreText, w - 12, y + 6);
+                    lbCtx.fillText(String(e.score), w-12, y+6);
                     lbCtx.textAlign = 'left';
                 } else {
-                    // empty row
-                    lbCtx.fillStyle = 'rgba(0,255,0,0.06)';
+                    lbCtx.fillStyle = 'rgba(0,255,0,0.06)'; 
                     lbCtx.font = '13px Verdana';
-                    lbCtx.fillText('-', 12, y + 6);
+                    lbCtx.fillText('-', 12, y+6);
                 }
             }
-
-            // scrollbar indicator on right
-            const total = Math.max(1, getLeaderboardList().length);
-            const scrollbarH = Math.max(24, Math.floor((LB_VISIBLE / Math.min(LB_VISIBLE, total)) * (h - startY - 20)));
-            const maxScroll = Math.max(0, total - LB_VISIBLE);
-            const scrollRatio = maxScroll ? lbScrollIndex / maxScroll : 0;
-            const trackY = startY + 2;
-            const trackH = h - startY - 12;
-            const thumbY = trackY + Math.floor(scrollRatio * (trackH - scrollbarH));
-            lbCtx.fillStyle = 'rgba(0,255,0,0.12)';
-            lbCtx.fillRect(w - 18, trackY, 12, trackH);
-            lbCtx.fillStyle = '#00ff00';
-            lbCtx.fillRect(w - 16, thumbY, 8, scrollbarH);
         }
 
-        // Orb / Spike / PowerUp classes (unchanged behavior)
-        class Orb {
-            constructor() {
-                this.radius = 10;
-                this.x = Math.random() * (canvas.width - 20) + 10;
-                this.y = Math.random() * (canvas.height - 20) + 10;
-            }
-            draw() {
-                ctx.fillStyle = '#00ff00';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fill();
-            }
+        // Entities - UPDATED: Use theme color for orbs
+        class Orb { 
+            constructor(){ 
+                this.radius=10; 
+                this.x=Math.random()*(canvas.width-20)+10; 
+                this.y=Math.random()*(canvas.height-20)+10; 
+                this.spawnTime = Date.now();
+                this._despawnId = setTimeout(() => {
+                    const idx = orbs.indexOf(this);
+                    if (idx !== -1) orbs.splice(idx, 1);
+                }, 60000);
+            } 
+            draw(){ 
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--main-color').trim() || '#00ff00';
+                ctx.beginPath(); 
+                ctx.arc(this.x,this.y,this.radius,0,Math.PI*2); 
+                ctx.fill(); 
+            } 
         }
+        
         class Spike {
-            constructor() {
-                this.width = 20;
-                this.height = 20;
-                this.y = Math.random() < 0.5 ? 0 : canvas.height;
-                this.x = this.randomSafeX();
-            }
-            randomSafeX() {
-                const safeDistance = 80;
-                let x, attempts = 0;
-                do {
-                    x = Math.random() * (canvas.width - this.width);
-                    attempts++;
-                    if (attempts > 50) break;
-                } while (Math.abs(x + this.width/2 - (player.x + player.width/2)) < safeDistance);
-                return x;
-            }
-            draw() {
-                ctx.fillStyle = '#ff0000';
-                ctx.beginPath();
-                if (this.y === 0) {
-                    ctx.moveTo(this.x, this.y);
-                    ctx.lineTo(this.x + this.width/2, this.y + this.height);
-                    ctx.lineTo(this.x + this.width, this.y);
-                } else {
-                    ctx.moveTo(this.x, this.y);
-                    ctx.lineTo(this.x + this.width/2, this.y - this.height);
-                    ctx.lineTo(this.x + this.width, this.y);
-                }
-                ctx.closePath();
-                ctx.fill();
-            }
+            constructor(){ this.width=20; this.height=20; this.y = Math.random()<0.5 ? 0 : canvas.height; this.x = this.randomSafeX(); }
+            randomSafeX(){ const safe=100; let x,att=0; do{ x=Math.random()*(canvas.width-this.width); att++; if(att>80) break; } while(Math.abs(x + this.width/2 - (player.x + player.width/2)) < safe); return x; }
+            draw(){ ctx.fillStyle='#ff0000'; ctx.beginPath(); if(this.y===0){ ctx.moveTo(this.x,this.y); ctx.lineTo(this.x+this.width/2,this.y+this.height); ctx.lineTo(this.x+this.width,this.y);} else { ctx.moveTo(this.x,this.y); ctx.lineTo(this.x+this.width/2,this.y-this.height); ctx.lineTo(this.x+this.width,this.y);} ctx.closePath(); ctx.fill(); }
         }
+        
         class PowerUp {
-            constructor(type) {
-                this.type = type;
-                this.radius = 12;
-                const safe = 100;
-                let attempts = 0;
-                do {
-                    this.x = Math.random() * (canvas.width - 40) + 20;
-                    this.y = Math.random() * (canvas.height - 40) + 20;
-                    attempts++;
-                    if (attempts > 80) break;
-                } while (Math.hypot((this.x) - (player.x + player.width/2), (this.y) - (player.y + player.height/2)) < safe);
+            constructor(type){ 
+                this.type=type; 
+                this.radius=12; 
+                const safe=100; 
+                let att=0; 
+                do{ 
+                    this.x=Math.random()*(canvas.width-40)+20; 
+                    this.y=Math.random()*(canvas.height-40)+20; 
+                    att++; 
+                    if(att>80) break;
+                } while(Math.hypot(this.x-(player.x+player.width/2), this.y-(player.y+player.height/2))<safe); 
+                this._despawnId = null; 
             }
-            draw() {
-                if (this.type === 'clearSpikes') lbColor = '#ff8800';
-                else if (this.type === 'magnetOrbs') lbColor = '#00ffff';
-                else lbColor = '#ff00ff';
-                ctx.fillStyle = lbColor;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#002200';
-                ctx.font = '12px Verdana';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                const label = this.type === 'clearSpikes' ? 'C' : this.type === 'magnetOrbs' ? 'M' : 'L';
-                ctx.fillText(label, this.x, this.y + 1);
+            draw(){ 
+                let c;
+                if (this.type === 'clearSpikes') c = '#ff8800';
+                else if (this.type === 'magnetOrbs') c = '#00ffff';
+                else if (this.type === 'extraLife') c = '#ff00ff';
+                
+                ctx.fillStyle=c; 
+                ctx.beginPath(); 
+                ctx.arc(this.x,this.y,this.radius,0,Math.PI*2); 
+                ctx.fill(); 
+                ctx.fillStyle='#002200'; 
+                ctx.font='12px Verdana'; 
+                ctx.textAlign='center'; 
+                ctx.textBaseline='middle'; 
+                const l = this.type==='clearSpikes'?'C':this.type==='magnetOrbs'?'M':this.type==='extraLife'?'L':'S';
+                ctx.fillText(l,this.x,this.y+1); 
             }
         }
 
-        // Controls using e.code (fixes sticky movement)
+        // Input handling - FIXED: Global event listeners
         let keys = {};
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') e.preventDefault();
+        
+        function handleKeyDown(e) {
+            if(e.code === 'Space') e.preventDefault();
             keys[e.code] = true;
-            if (e.code === 'Space') {
-                if (!gameStarted && !gameOver) {
-                    if (!currentPlayerName) { statusDisplay.textContent = 'Please enter a name before starting'; return; }
+
+            if (e.code === 'KeyA' || e.code === 'KeyD' || e.code === 'Space') {
+                resetInactivityTimer();
+            }
+
+            if(e.code === 'Space'){
+                if(overlay.style.display === 'flex' || gameOver){
+                    restartFromOverlay();
+                    return;
+                }
+                if(!gameStarted && !gameOver){
                     startGame();
                     return;
                 }
-                if (!gameOver && gameStarted) {
+                if(!gameOver && gameStarted){
                     gravityDirection *= -1;
                     player.speedY = 0;
                     gravityScale = 0.5;
                     clearTimeout(window._restoreGravityTimer);
-                    window._restoreGravityTimer = setTimeout(() => gravityScale = 1, 700);
-                    statusDisplay.textContent = gravityDirection === 1 ? 'Normal Gravity' : 'Upside Down!';
+                    window._restoreGravityTimer = setTimeout(()=>gravityScale=1,700);
                 }
             }
-        });
-        window.addEventListener('keyup', (e) => {
+        }
+
+        function handleKeyUp(e) {
             keys[e.code] = false;
-        });
-
-        // Spawning helpers
-        function spawnOrb() { orbs.push(new Orb()); }
-        function spawnSpike() {
-            const spike = new Spike();
-            const safeDistance = 60;
-            if (Math.abs(spike.x + spike.width/2 - (player.x + player.width/2)) < safeDistance) {
-                if (spike.x < canvas.width/2) spike.x = Math.max(0, player.x + player.width/2 + safeDistance);
-                else spike.x = Math.min(canvas.width - spike.width, player.x + player.width/2 - safeDistance);
-            }
-            spikes.push(spike);
-        }
-        function spawnPowerUpRandom() {
-            const types = ['clearSpikes','magnetOrbs','extraLife'];
-            const type = types[Math.floor(Math.random() * types.length)];
-            powerups.push(new PowerUp(type));
         }
 
-        // Reset / Start / End
-        let loopRunning = false;
-        function resetGameState() {
-            score = 0;
-            gameOver = false;
-            gameStarted = false;
-            gravityDirection = 1;
-            gravityScale = 1;
-            orbs = [];
-            spikes = [];
+        // Focus management
+        function focusCanvas() {
+            canvas.focus();
+        }
+
+        canvas.addEventListener('click', focusCanvas);
+        startBtn.addEventListener('click', focusCanvas);
+        restartBtn.addEventListener('click', focusCanvas);
+
+        // Reset/Start/End - FIXED: Player starts on floor
+        function resetGameState(){
+            if(powerupTimerId){ clearTimeout(powerupTimerId); powerupTimerId = null; }
+            orbs = []; spikes = []; 
+            for(const p of powerups){ if(p && p._despawnId) clearTimeout(p._despawnId); }
             powerups = [];
-            player.width = 30;
-            player.height = 30;
-            player.x = 50;
-            player.y = canvas.height - 50;
-            player.speedX = 0;
-            player.speedY = 0;
-            keys = {}; // clear keys so movement stops
-            lives = 3;
-            statusDisplay.textContent = 'Enter name and press Start or Space';
+            score = 0; gameOver = false; gameStarted = false;
+            gravityDirection = 1; gravityScale = 1;
+            player.width = 30; player.height = 30;
+            player.speedX = 0; player.speedY = 0;
+            keys = {}; 
+            gameOverReason = '';
+            lives = 3; statusDisplay.textContent = 'Press Start or Space to begin';
+            statusDisplay.style.color = getComputedStyle(document.documentElement).getPropertyValue('--main-color').trim() || '#00ff00';
             overlay.style.display = 'none';
-            livesDisplay.textContent = lives;
-            scoreDisplay.textContent = score;
-            // initial safe spawns
-            for (let i = 0; i < 4; i++) spawnOrb();
-            for (let i = 0; i < 3; i++) spawnSpike();
+            livesDisplay.textContent = lives; scoreDisplay.textContent = score;
+            startTime = 0; elapsedMs = 0; timerDisplay.textContent = formatTime(0);
+            stopInactivityTimer();
+            inactivityTime = 6.0;
+            updateInactivityDisplay();
+            
+            // FIXED: Reset spike spawn tracking completely
+            lastSpikeSpawnScore = 0;
+            spikeSpawnInterval = 23; // Reset interval
+            
+            // Chain
+            chain = 0;
+            
+            // FIX: Position player on floor
+            player.x = 50;
+            player.y = canvas.height - player.height - 10;
+            
+            for(let i=0;i<4;i++) spawnOrb();
+            for(let i=0;i<3;i++) spawnSpike();
+            clampPlayerInside();
             renderLeaderboardCanvas();
+            gameStartTime = Date.now();
+            schedulePowerupNext();
+            
+            // Clear any pending gravity restore timer
+            clearTimeout(window._restoreGravityTimer);
+            
+            // Cancel any pending animation frame to prevent multiple loops
+            if (rafId) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
+            loopRunning = false;
+            
+            setTimeout(focusCanvas, 100);
         }
 
-        function startGame() {
-            if (!currentPlayerName) { statusDisplay.textContent = 'Please enter a name before starting'; return; }
-            if (!loopRunning) { loopRunning = true; requestAnimationFrame(gameLoop); }
-            gameStarted = true;
-            statusDisplay.textContent = gravityDirection === 1 ? 'Normal Gravity' : 'Upside Down!';
+        let rafId = null;
+
+        function startGame(){
+            if(!loopRunning) { 
+                loopRunning = true; 
+                rafId = requestAnimationFrame(gameLoop); 
+            }
+            gameStarted = true; 
+            startTime = Date.now(); 
+            elapsedMs = 0;
+            gameStartTime = Date.now();
+            startInactivityTimer();
+            focusCanvas();
         }
 
-        function endGame() {
+        function endGame(){
+            if(gameOver) return;
             gameOver = true;
             overlay.style.display = 'flex';
-            gameOverText.textContent = 'Game Over! Score: ' + score;
-            statusDisplay.textContent = 'Game Over';
-            // save to leaderboard
-            const list = loadLeaderboard();
-            list.push({ name: currentPlayerName || 'Anon', score: score, date: new Date().toISOString() });
-            list.sort((a, b) => b.score - a.score);
-            saveLeaderboard(list.slice(0, 100));
-            // update leaderboard view and reset scroll to top
-            lbScrollIndex = 0;
-            renderLeaderboardCanvas();
-        }
-
-        // Power-up effects
-        function applyPowerUp(p) {
-            if (p.type === 'clearSpikes') {
-                spikes = [];
-            } else if (p.type === 'magnetOrbs') {
-                let gained = 0;
-                for (let i = orbs.length -1; i >= 0; i--) {
-                    gained += 5;
-                    orbs.splice(i,1);
-                }
-                score += gained;
-            } else if (p.type === 'extraLife') {
-                lives = Math.min(MAX_LIVES, lives + 1);
-                livesDisplay.textContent = lives;
-            }
-        }
-
-        // Game loop
-        function gameLoop() {
-            loopRunning = true;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            if (!gameStarted) {
-                // idle draw
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(player.x, player.y, player.width, player.height);
-                orbs.forEach(orb => orb.draw());
-                spikes.forEach(spike => spike.draw());
-                powerups.forEach(p => p.draw());
-                scoreDisplay.textContent = score;
-                if (!gameOver) requestAnimationFrame(gameLoop);
-                return;
-            }
-
-            if (gameOver) {
-                loopRunning = false;
-                return;
-            }
-
-            // movement using e.code keys
-            if (keys['KeyA']) player.speedX = -5;
-            else if (keys['KeyD']) player.speedX = 5;
-            else player.speedX = 0;
-
-            player.speedY += player.gravity * gravityDirection * gravityScale;
-            player.x += player.speedX;
-            player.y += player.speedY;
-
-            // collisions with bounds
-            if (gravityDirection === 1) {
-                if (player.y > canvas.height - player.height) {
-                    player.y = canvas.height - player.height;
-                    player.speedY = 0;
-                    player.onGround = true;
-                } else player.onGround = false;
+            
+            if (gameOverReason === 'timeout') {
+                gameOverText.textContent = 'Game Over! Inactivity Timeout - Score: ' + score;
+                statusDisplay.textContent = 'Inactivity Timeout';
             } else {
-                if (player.y < 0) {
-                    player.y = 0;
-                    player.speedY = 0;
-                    player.onGround = true;
-                } else player.onGround = false;
+                gameOverText.textContent = 'Game Over! Score: ' + score;
+                statusDisplay.textContent = 'Game Over';
             }
+            
+            stopInactivityTimer();
+            
+            updateLeaderboard({ 
+                name: currentPlayerName, 
+                score: score, 
+                timeMs: elapsedMs || 0, 
+                date: new Date().toISOString() 
+            });
+            
+            renderLeaderboardCanvas();
+            if(powerupTimerId){ clearTimeout(powerupTimerId); powerupTimerId = null; }
+            for(const p of powerups) if(p && p._despawnId){ clearTimeout(p._despawnId); p._despawnId = null; }
+        }
 
+        // Inactivity timer functions
+        function startInactivityTimer() {
+            resetInactivityTimer();
+            inactivityTimerId = setInterval(updateInactivityTimer, 100);
+        }
+
+        function stopInactivityTimer() {
+            if (inactivityTimerId) {
+                clearInterval(inactivityTimerId);
+                inactivityTimerId = null;
+            }
+        }
+
+        function resetInactivityTimer() {
+            inactivityTime = 6.0;
+            lastMovementTime = Date.now();
+            updateInactivityDisplay();
+        }
+
+        function updateInactivityTimer() {
+            if (!gameStarted || gameOver) return;
+            
+            const now = Date.now();
+            inactivityTime = Math.max(0, 6.0 - (now - lastMovementTime) / 1000);
+            updateInactivityDisplay();
+            
+            if (inactivityTime <= 0) {
+                gameOverReason = 'timeout';
+                endGame();
+            }
+        }
+
+        function updateInactivityDisplay() {
+            inactivityTimerDisplay.textContent = inactivityTime.toFixed(1) + 's';
+        }
+
+        // Spawn functions
+        function spawnOrb() {
+            orbs.push(new Orb());
+        }
+
+        function spawnSpike() {
+            spikes.push(new Spike());
+        }
+
+        function spawnPowerUp(type) {
+            const powerup = new PowerUp(type);
+            powerup._despawnId = setTimeout(() => {
+                const idx = powerups.indexOf(powerup);
+                if (idx !== -1) powerups.splice(idx, 1);
+            }, 10000);
+            powerups.push(powerup);
+        }
+
+        // Power-up scheduling
+        function schedulePowerupNext() {
+            if (powerupTimerId) clearTimeout(powerupTimerId);
+            powerupTimerId = setTimeout(spawnRandomPowerup, 15000 + Math.random() * 15000);
+        }
+
+        function spawnRandomPowerup() {
+            if (gameOver || !gameStarted) {
+                schedulePowerupNext();
+                return;
+            }
+            
+            const types = ['clearSpikes', 'magnetOrbs', 'extraLife'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            spawnPowerUp(type);
+            schedulePowerupNext();
+        }
+
+        // Game mechanics
+        function clampPlayerInside() {
             if (player.x < 0) player.x = 0;
-            if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+            if (player.y < 0) player.y = 0;
+            if (player.y + player.height > canvas.height) player.y = canvas.height - player.height;
+        }
 
-            // draw player
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(player.x, player.y, player.width, player.height);
+        function restartFromOverlay() {
+            resetGameState();
+            startGame();
+        }
 
-            // orbs
+        // Collision detection - FIXED: Spike collision behavior
+        function checkCollisions() {
+            // Check orb collisions
             for (let i = orbs.length - 1; i >= 0; i--) {
                 const orb = orbs[i];
-                orb.draw();
-                const dist = Math.hypot(player.x + player.width/2 - orb.x, player.y + player.height/2 - orb.y);
-                if (dist < player.width/2 + orb.radius) {
-                    score += 5;
-                    orbs.splice(i, 1);
-                }
-            }
-
-            // powerups draw & collide
-            for (let i = powerups.length -1; i >= 0; i--) {
-                const p = powerups[i];
-                p.draw();
-                const dist = Math.hypot(player.x + player.width/2 - p.x, player.y + player.height/2 - p.y);
-                if (dist < player.width/2 + p.radius) {
-                    applyPowerUp(p);
-                    powerups.splice(i,1);
-                }
-            }
-
-            // spikes
-            for (let i = spikes.length - 1; i >= 0; i--) {
-                const spike = spikes[i];
-                spike.draw();
-                const spikeCenterX = spike.x + spike.width/2;
-                const spikeCenterY = spike.y === 0 ? spike.height/2 : spike.y - spike.height/2;
-                const distX = Math.abs(player.x + player.width/2 - spikeCenterX);
-                const distY = Math.abs(player.y + player.height/2 - spikeCenterY);
-                if (distX < player.width/2 + spike.width/2 && distY < player.height/2 + spike.height/2) {
-                    if (lives > 0) {
-                        lives--;
-                        livesDisplay.textContent = lives;
-                        spikes.splice(i,1);
-                        player.speedY = -6 * gravityDirection;
+                const dx = (player.x + player.width/2) - orb.x;
+                const dy = (player.y + player.height/2) - orb.y;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                
+                if (distance < player.width/2 + orb.radius) {
+                    let points;
+                    if (player.onGround) {
+                        points = 5;
                     } else {
-                        endGame();
-                        break;
+                        chain++;
+                        points = 10 * chain;
+                    }
+                    score += points;
+                    scoreDisplay.textContent = score;
+                    orbs.splice(i, 1);
+                    clearTimeout(orb._despawnId);
+                    spawnOrb();
+                    
+                    // FIXED: Spike spawn logic - spawn 50% faster
+                    if (score - lastSpikeSpawnScore >= spikeSpawnInterval && spikes.length < 8) {
+                        spawnSpike();
+                        lastSpikeSpawnScore = score;
                     }
                 }
             }
-
-            // spawn new items
-            if (Math.random() < 0.02) spawnOrb();
-            if (Math.random() < 0.01) spawnSpike();
-
-            scoreDisplay.textContent = score;
-            requestAnimationFrame(gameLoop);
+            
+            // Check spike collisions - FIXED: Destroy spike and keep player position
+            for (let i = spikes.length - 1; i >= 0; i--) {
+                const spike = spikes[i];
+                let collided = false;
+                
+                if (spike.y === 0) { // Top spike
+                    if (player.y < spike.height && 
+                        player.x + player.width > spike.x && 
+                        player.x < spike.x + spike.width) {
+                        collided = true;
+                    }
+                } else { // Bottom spike
+                    if (player.y + player.height > canvas.height - spike.height && 
+                        player.x + player.width > spike.x && 
+                        player.x < spike.x + spike.width) {
+                        collided = true;
+                    }
+                }
+                
+                if (collided) {
+                    // Remove the spike that was hit
+                    spikes.splice(i, 1);
+                    
+                    lives--;
+                    livesDisplay.textContent = lives;
+                    
+                    if (lives <= 0) {
+                        endGame();
+                        return;
+                    }
+                    
+                    // FIXED: Don't reset player position - keep them where they are
+                    // Just give a small knockback effect instead
+                    player.speedY = -gravityDirection * 8; // Small bounce effect
+                    
+                    statusDisplay.textContent = 'Hit! Lives: ' + lives;
+                    setTimeout(() => {
+                        if (!gameOver) statusDisplay.textContent = 'Playing...';
+                    }, 1000);
+                }
+            }
+            
+            // Check power-up collisions
+            for (let i = powerups.length - 1; i >= 0; i--) {
+                const powerup = powerups[i];
+                const dx = (player.x + player.width/2) - powerup.x;
+                const dy = (player.y + player.height/2) - powerup.y;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                
+                if (distance < player.width/2 + powerup.radius) {
+                    clearTimeout(powerup._despawnId);
+                    
+                    switch(powerup.type) {
+                        case 'clearSpikes':
+                            spikes = [];
+                            statusDisplay.textContent = 'Spikes Cleared!';
+                            break;
+                        case 'magnetOrbs':
+                            // Attract all orbs to player
+                            for (let orb of orbs) {
+                                const dx = (player.x + player.width/2) - orb.x;
+                                const dy = (player.y + player.height/2) - orb.y;
+                                const distance = Math.sqrt(dx*dx + dy*dy);
+                                if (distance < 300) {
+                                    orb.x += dx * 0.1;
+                                    orb.y += dy * 0.1;
+                                }
+                            }
+                            statusDisplay.textContent = 'Magnet Active!';
+                            break;
+                        case 'extraLife':
+                            if (lives < MAX_LIVES) {
+                                lives++;
+                                livesDisplay.textContent = lives;
+                                statusDisplay.textContent = 'Extra Life!';
+                            } else {
+                                statusDisplay.textContent = 'Max Lives!';
+                            }
+                            break;
+                    }
+                    
+                    setTimeout(() => {
+                        if (!gameOver) statusDisplay.textContent = 'Playing...';
+                    }, 2000);
+                    
+                    powerups.splice(i, 1);
+                }
+            }
         }
 
-        // powerups spawn about once a minute
-        let powerupInterval = setInterval(() => {
+        // Main game loop
+        function gameLoop() {
+            if (!loopRunning) return;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Update game state if playing
             if (gameStarted && !gameOver) {
-                if (Math.random() < 0.65) spawnPowerUpRandom();
-            } else {
-                if (Math.random() < 0.08) spawnPowerUpRandom();
+                // Update timer
+                elapsedMs = Date.now() - startTime;
+                timerDisplay.textContent = formatTime(elapsedMs);
+                
+                // Apply gravity
+                player.speedY += player.gravity * gravityDirection * gravityScale;
+                
+                // Handle input
+                if (keys['KeyA']) {
+                    player.speedX = -5;
+                } else if (keys['KeyD']) {
+                    player.speedX = 5;
+                } else {
+                    player.speedX *= 0.9; // Friction
+                }
+                
+                // Update player position
+                player.x += player.speedX;
+                player.y += player.speedY;
+                
+                // Check if player is on ground/ceiling
+                player.onGround = false;
+                if (gravityDirection > 0 && player.y + player.height >= canvas.height) {
+                    player.y = canvas.height - player.height;
+                    player.speedY = 0;
+                    player.onGround = true;
+                    chain = 0;
+                } else if (gravityDirection < 0 && player.y <= 0) {
+                    player.y = 0;
+                    player.speedY = 0;
+                    player.onGround = true;
+                    chain = 0;
+                }
+                
+                // Keep player in bounds
+                clampPlayerInside();
+                
+                // Check collisions
+                checkCollisions();
+                
             }
-        }, 60000);
+            
+            // Draw player
+            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--main-color').trim() || '#00ff00';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            
+            // Draw orbs
+            for (let orb of orbs) {
+                orb.draw();
+            }
+            
+            // Draw spikes
+            for (let spike of spikes) {
+                spike.draw();
+            }
+            
+            // Draw power-ups
+            for (let powerup of powerups) {
+                powerup.draw();
+            }
+            
+            // Continue the game loop
+            rafId = requestAnimationFrame(gameLoop);
+        }
 
-        // UI bindings
-        saveNameBtn.addEventListener('click', () => {
-            const v = nameInput.value.trim();
-            if (!v) { statusDisplay.textContent = 'Name cannot be empty'; return; }
-            currentPlayerName = v.slice(0,16);
-            statusDisplay.textContent = `Name saved: ${currentPlayerName}`;
-        });
-
-        startBtn.addEventListener('click', () => {
-            if (!currentPlayerName) { statusDisplay.textContent = 'Please enter a name before starting'; return; }
+        // Initialize the game
+        if (checkPlayerName()) {
+            // Set up global event listeners
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('keyup', handleKeyUp);
+            window.addEventListener('blur', ()=>{ keys = {}; });
+            
+            // Set up button event listeners
+            startBtn.addEventListener('click', startGame);
+            restartBtn.addEventListener('click', restartFromOverlay);
+            
+            resizeCanvas();
             resetGameState();
-            startGame();
-        });
-
-        restartBtn.addEventListener('click', () => {
-            resetGameState();
-            // keep the saved name
-            if (!loopRunning) requestAnimationFrame(gameLoop);
-        });
-
-        // leaderboard canvas interactions
-        lbUp.addEventListener('click', () => {
-            lbScrollIndex = Math.max(0, lbScrollIndex - 1);
             renderLeaderboardCanvas();
-        });
-        lbDown.addEventListener('click', () => {
-            const total = Math.max(0, getLeaderboardList().length);
-            lbScrollIndex = Math.min(Math.max(0, total - LB_VISIBLE), lbScrollIndex + 1);
-            renderLeaderboardCanvas();
-        });
-        lbCanvas.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            const delta = Math.sign(e.deltaY);
-            const total = Math.max(0, getLeaderboardList().length);
-            lbScrollIndex = Math.min(Math.max(0, total - LB_VISIBLE), lbScrollIndex + delta);
-            renderLeaderboardCanvas();
-        }, { passive: false });
-
-        // initial setup
-        resizeCanvas();
-        resetGameState();
-        renderLeaderboardCanvas();
-        // make canvas focusable so keyboard works reliably
-        canvas.tabIndex = 1000;
-        canvas.style.outline = 'none';
-        canvas.focus();
+            initVisitorCounter();
+            
+            // Focus canvas after a short delay
+            setTimeout(focusCanvas, 500);
+        }
     </script>
 </body>
 </html>
