@@ -3,6 +3,9 @@
 <head>
     <meta charset="utf-8" />
     <title>Gravity Glitch</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
     <style>
         :root {
             --main-color: #00ff00;
@@ -76,6 +79,15 @@
         }
         
         .no-ui{outline:none}
+
+        /* Global Leaderboard Indicator */
+        .global-indicator {
+            background: #002200;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -94,7 +106,7 @@
     </div>
 
     <div id="container">
-        <h1>Gravity Glitch</h1>
+        <h1>Gravity Glitch <span class="global-indicator">🌐 Global Leaderboard</span></h1>
 
         <div class="player-info">
             Player: <span id="currentPlayerName">Loading...</span>
@@ -131,6 +143,27 @@
     </div>
 
     <script>
+        // === FIREBASE CONFIGURATION ===
+        // REPLACE THESE VALUES WITH YOUR ACTUAL FIREBASE CONFIG
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY_HERE",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        let db;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            console.log("Firebase initialized successfully for game");
+        } catch (error) {
+            console.log("Firebase initialization failed:", error);
+        }
+
         // Color customization system
         const COLOR_STORAGE_KEY = 'minibossThemeColor';
         
@@ -232,6 +265,76 @@
             return true;
         }
 
+        // === FIREBASE FUNCTIONS FOR GAME ===
+        async function submitScoreToFirebase(score, timeMs) {
+            if (!db) {
+                console.log("Firebase not available, using local storage");
+                return;
+            }
+
+            try {
+                const scoreData = {
+                    playerName: currentPlayerName,
+                    score: score,
+                    timeMs: timeMs,
+                    game: 'gravity-glitch',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    version: '1.0'
+                };
+
+                await db.collection('gameScores').add(scoreData);
+                console.log("Score submitted to Firebase");
+            } catch (error) {
+                console.log("Error submitting score to Firebase:", error);
+            }
+        }
+
+        async function getGlobalLeaderboard() {
+            if (!db) {
+                return getLocalLeaderboard();
+            }
+
+            try {
+                const snapshot = await db.collection('gameScores')
+                    .where('game', '==', 'gravity-glitch')
+                    .orderBy('score', 'desc')
+                    .limit(50)
+                    .get();
+
+                const leaderboard = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    leaderboard.push({
+                        name: data.playerName,
+                        score: data.score,
+                        timeMs: data.timeMs,
+                        date: data.timestamp?.toDate?.() || new Date()
+                    });
+                });
+
+                return leaderboard;
+            } catch (error) {
+                console.log("Error fetching global leaderboard:", error);
+                return getLocalLeaderboard();
+            }
+        }
+
+        async function trackGameVisit() {
+            if (!db) return;
+
+            try {
+                const visitData = {
+                    playerName: currentPlayerName,
+                    game: 'gravity-glitch',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                await db.collection('gameVisits').add(visitData);
+            } catch (error) {
+                console.log("Error tracking game visit:", error);
+            }
+        }
+
         // Visitor counter system
         const GAME_VISITOR_STORAGE_KEY = 'gravityGlitchVisitors_v2';
         const GAME_VISITOR_SESSION_KEY = 'gravityGlitchSession_v2';
@@ -251,6 +354,9 @@
                 }
                 
                 saveVisitorData(visitorData);
+
+                // Track game visit in Firebase
+                trackGameVisit();
             }
             
             gameVisitsDisplay.textContent = visitorData.totalVisits;
@@ -353,7 +459,7 @@
             return `${minutes}:${String(seconds).padStart(2,'0')}.${String(hundredths).padStart(2,'0')}`;
         }
 
-        // Leaderboard
+        // Leaderboard - UPDATED WITH FIREBASE
         const STORAGE_KEY = 'gravityGlitchLeaderboard_final_v2';
         const LB_VISIBLE = 10, LB_MAX = 50;
         
@@ -370,13 +476,13 @@
             } catch(e){} 
         }
         
-        function getLeaderboardList(){ 
+        function getLocalLeaderboard(){ 
             const list = loadLeaderboard().slice(0); 
             list.sort((a,b)=> b.score - a.score || a.timeMs - b.timeMs); 
             return list.slice(0, LB_MAX); 
         }
 
-        function updateLeaderboard(newEntry) {
+        function updateLocalLeaderboard(newEntry) {
             let list = loadLeaderboard();
             
             const existingIndex = list.findIndex(entry => 
@@ -399,8 +505,9 @@
             saveLeaderboard(list.slice(0, LB_MAX));
         }
 
-        function renderLeaderboardCanvas(){
-            const list = getLeaderboardList();
+        // UPDATED: Render leaderboard with Firebase data
+        async function renderLeaderboardCanvas(){
+            const list = await getGlobalLeaderboard();
             const w = lbCanvas.width, h = lbCanvas.height;
             lbCtx.clearRect(0,0,w,h);
             lbCtx.fillStyle = '#001100'; 
@@ -408,7 +515,7 @@
             lbCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--main-color').trim() || '#00ff00';
             lbCtx.font = '18px Verdana'; 
             lbCtx.textBaseline='top';
-            lbCtx.fillText('Leaderboard — Top ' + LB_MAX, 10, 8);
+            lbCtx.fillText('🌐 Global Leaderboard — Top ' + LB_VISIBLE, 10, 8);
             const startY = 36;
             const rowH = Math.floor((h - startY - 10) / LB_VISIBLE);
             for(let i=0;i<LB_VISIBLE;i++){
@@ -418,7 +525,12 @@
                 lbCtx.fillRect(6,y,w-12,rowH-2);
                 if(idx < list.length){
                     const e = list[idx];
-                    lbCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--main-color').trim() || '#00ff00';
+                    // Highlight current player
+                    if (e.name === currentPlayerName) {
+                        lbCtx.fillStyle = '#ffff00';
+                    } else {
+                        lbCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--main-color').trim() || '#00ff00';
+                    }
                     lbCtx.font = '14px Verdana';
                     lbCtx.fillText((idx+1)+'.', 12, y+6);
                     lbCtx.fillText((e.name||'Anon').slice(0,18), 56, y+6);
@@ -604,6 +716,7 @@
             focusCanvas();
         }
 
+        // UPDATED: End game with Firebase submission
         function endGame(){
             if(gameOver) return;
             gameOver = true;
@@ -619,7 +732,9 @@
             
             stopInactivityTimer();
             
-            updateLeaderboard({ 
+            // Submit to Firebase AND local storage
+            submitScoreToFirebase(score, elapsedMs);
+            updateLocalLeaderboard({ 
                 name: currentPlayerName, 
                 score: score, 
                 timeMs: elapsedMs || 0, 
