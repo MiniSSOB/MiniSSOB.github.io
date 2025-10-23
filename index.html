@@ -5,20 +5,20 @@
     <style>
         body {
             background: #111;
-            color: #00ff00;
+            color: var(--main-color, #00ff00);
             font-family: 'Verdana', sans-serif;
             text-align: center;
             margin: 0;
             padding: 20px;
         }
         h1 {
-            color: #00ff00;
-            text-shadow: 0 0 10px #00ff00;
+            color: var(--main-color, #00ff00);
+            text-shadow: 0 0 10px var(--main-color, #00ff00);
             font-size: 40px;
             margin-bottom: 10px;
         }
         .subtitle {
-            color: #00cc00;
+            color: var(--main-color, #00cc00);
             font-size: 18px;
             margin-bottom: 30px;
         }
@@ -29,36 +29,333 @@
         .game-link {
             display: block;
             background: #222;
-            color: #00ff00;
+            color: var(--main-color, #00ff00);
             text-decoration: none;
             padding: 15px;
             margin: 10px 0;
-            border: 2px solid #00ff00;
+            border: 2px solid var(--main-color, #00ff00);
             border-radius: 8px;
             font-size: 20px;
         }
         .game-link:hover {
-            background: #00ff00;
+            background: var(--main-color, #00ff00);
             color: #111;
-            box-shadow: 0 0 15px #00ff00;
+            box-shadow: 0 0 15px var(--main-color, #00ff00);
+        }
+        .name-setup {
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 30px;
+            border: 2px solid var(--main-color, #00ff00);
+            border-radius: 8px;
+            background: #222;
+        }
+        input[type="text"] {
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid var(--main-color, #00aa00);
+            background: #111;
+            color: var(--main-color, #00ff00);
+            width: 250px;
+            margin: 10px 0;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        button {
+            background: var(--main-color, #00aa00);
+            color: #002200;
+            border: none;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: var(--main-color, #00ff00);
+        }
+        .current-player {
+            margin: 20px 0;
+            padding: 10px;
+            background: rgba(0, 51, 0, 0.5);
+            border: 1px solid var(--main-color, #00ff00);
+            border-radius: 5px;
+            display: inline-block;
         }
         footer {
             margin-top: 50px;
-            color: #008800;
+            color: var(--main-color, #008800);
             font-size: 14px;
+        }
+        .visitor-counter {
+            font-size: 12px;
+            color: var(--main-color, #008800);
+            margin-top: 20px;
+        }
+        #mainContent {
+            display: none;
+        }
+        
+        /* Color Picker Styles */
+        .color-picker {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .color-toggle {
+            background: #222;
+            color: var(--main-color, #00ff00);
+            border: 2px solid var(--main-color, #00ff00);
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .color-options {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: #222;
+            border: 2px solid var(--main-color, #00ff00);
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 5px;
+            min-width: 150px;
+        }
+        .color-option {
+            display: block;
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 3px;
+            cursor: pointer;
+            text-align: left;
+        }
+        .color-option:hover {
+            background: #444;
+        }
+        .color-preview {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+            vertical-align: middle;
         }
     </style>
 </head>
 <body>
-    <h1>🕹️ MiniBOSS GAMES</h1>
-    <div class="subtitle">Home for my HTML5 games</div>
-    
-    <div class="game-list">
-        <a href="gravity-glitch.html" class="game-link">🎮 Gravity Glitch</a>
+    <div class="color-picker">
+        <div class="color-toggle" onclick="toggleColorOptions()">🎨 Theme</div>
+        <div class="color-options" id="colorOptions">
+            <button class="color-option" onclick="setColor('#00ff00')"><span class="color-preview" style="background:#00ff00"></span>Green</button>
+            <button class="color-option" onclick="setColor('#ff0000')"><span class="color-preview" style="background:#ff0000"></span>Red</button>
+            <button class="color-option" onclick="setColor('#0000ff')"><span class="color-preview" style="background:#0000ff"></span>Blue</button>
+            <button class="color-option" onclick="setColor('#ffff00')"><span class="color-preview" style="background:#ffff00"></span>Yellow</button>
+            <button class="color-option" onclick="setColor('#ff00ff')"><span class="color-preview" style="background:#ff00ff"></span>Magenta</button>
+            <button class="color-option" onclick="setColor('#00ffff')"><span class="color-preview" style="background:#00ffff"></span>Cyan</button>
+            <button class="color-option" onclick="setColor('#ff8800')"><span class="color-preview" style="background:#ff8800"></span>Orange</button>
+            <button class="color-option" onclick="setColor('#ffffff')"><span class="color-preview" style="background:#ffffff"></span>White</button>
+        </div>
     </div>
 
-    <footer>
-        © 2024 MiniBOSS GAMES (MBG)
-    </footer>
+    <div id="nameSetup" class="name-setup">
+        <h1>🕹️ MiniBOSS GAMES</h1>
+        <h3>Enter Your Player Name</h3>
+        <p style="font-size: 14px; margin-bottom: 15px;">Choose your name carefully - it cannot be changed!</p>
+        <input id="playerNameInput" type="text" placeholder="Enter name (max 16 chars)" maxlength="16" />
+        <button id="saveNameBtn">Save Name</button>
+    </div>
+
+    <div id="mainContent">
+        <h1>🕹️ MiniBOSS GAMES</h1>
+        
+        <div id="currentPlayer" class="current-player">
+            <strong>Current Player:</strong> <span id="currentPlayerName"></span>
+        </div>
+
+        <div class="game-list">
+            <a id="gravityGlitchLink" href="gravity-glitch.html" class="game-link">🎮 Gravity Glitch</a>
+        </div>
+
+        <footer>
+            © 2024 MiniBOSS GAMES (MBG)
+            <div class="visitor-counter">Total Visits: <span id="totalVisits">0</span> | Unique Visitors: <span id="uniqueVisitors">0</span></div>
+        </footer>
+    </div>
+
+    <script>
+        // Color customization system
+        const COLOR_STORAGE_KEY = 'minibossThemeColor';
+        
+        function loadColor() {
+            try {
+                return localStorage.getItem(COLOR_STORAGE_KEY) || '#00ff00';
+            } catch (e) {
+                return '#00ff00';
+            }
+        }
+        
+        function saveColor(color) {
+            try {
+                localStorage.setItem(COLOR_STORAGE_KEY, color);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        function setColor(color) {
+            document.documentElement.style.setProperty('--main-color', color);
+            saveColor(color);
+            toggleColorOptions(); // Close the dropdown
+        }
+        
+        function toggleColorOptions() {
+            const options = document.getElementById('colorOptions');
+            options.style.display = options.style.display === 'block' ? 'none' : 'block';
+        }
+        
+        // Close color picker when clicking outside
+        document.addEventListener('click', function(event) {
+            const colorPicker = document.querySelector('.color-picker');
+            if (!colorPicker.contains(event.target)) {
+                document.getElementById('colorOptions').style.display = 'none';
+            }
+        });
+        
+        // Apply saved color on load
+        const savedColor = loadColor();
+        document.documentElement.style.setProperty('--main-color', savedColor);
+
+        // Visitor counter system for main page
+        const MAIN_VISITOR_STORAGE_KEY = 'mainPageVisitors';
+        const MAIN_VISITOR_SESSION_KEY = 'mainPageSession';
+        
+        function initVisitorCounter() {
+            let visitorData = loadVisitorData();
+            const currentSessionId = generateSessionId();
+            
+            const lastSessionId = sessionStorage.getItem(MAIN_VISITOR_SESSION_KEY);
+            if (!lastSessionId) {
+                visitorData.totalVisits++;
+                sessionStorage.setItem(MAIN_VISITOR_SESSION_KEY, currentSessionId);
+                
+                const visitorFingerprint = getVisitorFingerprint();
+                if (!visitorData.uniqueVisitors.includes(visitorFingerprint)) {
+                    visitorData.uniqueVisitors.push(visitorFingerprint);
+                }
+                
+                saveVisitorData(visitorData);
+            }
+            
+            document.getElementById('totalVisits').textContent = visitorData.totalVisits;
+            document.getElementById('uniqueVisitors').textContent = visitorData.uniqueVisitors.length;
+        }
+        
+        function loadVisitorData() {
+            try {
+                const data = localStorage.getItem(MAIN_VISITOR_STORAGE_KEY);
+                if (data) {
+                    return JSON.parse(data);
+                }
+            } catch (e) {}
+            
+            return {
+                totalVisits: 0,
+                uniqueVisitors: []
+            };
+        }
+        
+        function saveVisitorData(data) {
+            try {
+                localStorage.setItem(MAIN_VISITOR_STORAGE_KEY, JSON.stringify(data));
+            } catch (e) {}
+        }
+        
+        function generateSessionId() {
+            return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        function getVisitorFingerprint() {
+            return btoa(navigator.userAgent + screen.width + screen.height + screen.colorDepth);
+        }
+
+        // Player name system
+        const PLAYER_NAME_KEY = 'minibossPlayerName';
+        
+        function loadPlayerName() {
+            try {
+                return localStorage.getItem(PLAYER_NAME_KEY);
+            } catch (e) {
+                return null;
+            }
+        }
+        
+        function savePlayerName(name) {
+            try {
+                localStorage.setItem(PLAYER_NAME_KEY, name);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        function setupPlayerName() {
+            const savedName = loadPlayerName();
+            const nameSetup = document.getElementById('nameSetup');
+            const mainContent = document.getElementById('mainContent');
+            
+            if (savedName) {
+                nameSetup.style.display = 'none';
+                mainContent.style.display = 'block';
+                document.getElementById('currentPlayerName').textContent = savedName;
+            } else {
+                nameSetup.style.display = 'block';
+                mainContent.style.display = 'none';
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('saveNameBtn').addEventListener('click', function() {
+            const nameInput = document.getElementById('playerNameInput');
+            const name = nameInput.value.trim();
+            
+            if (!name) {
+                alert('Please enter a name');
+                return;
+            }
+            
+            if (name.length > 16) {
+                alert('Name must be 16 characters or less');
+                return;
+            }
+            
+            if (savePlayerName(name)) {
+                setupPlayerName();
+                initVisitorCounter();
+            } else {
+                alert('Error saving name. Please try again.');
+            }
+        });
+
+        document.getElementById('playerNameInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('saveNameBtn').click();
+            }
+        });
+        
+        // Initialize
+        setupPlayerName();
+        if (loadPlayerName()) {
+            initVisitorCounter();
+        }
+    </script>
 </body>
 </html>
